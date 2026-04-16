@@ -2,6 +2,8 @@
 
 CPU Affinity Pin with Cache Topology Awareness for Linux/POSIX x86-64 systems.
 
+A CPU affinity tool that pins processes to cache domains (L1I, L1D, L2, L3) rather than individual cores. It reads Linux sysfs to map which cores share which cache levels.
+
 - cli.py - CLI entry point with commands: show, pin, unpin, suggest
 - src/topology.py - Discovers cache topology from Linux sysfs (/sys/devices/system/cpu/)
 - src/pinner.py - Process pinning logic using taskset
