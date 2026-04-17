@@ -1,6 +1,5 @@
 # # Cache + NUMA // Process Affinity Mapper
-> Pin processes to CPU cache domains on Linux x86-64 systems, with NUMA awareness.
-Sometimes you want your process to stay close to its cache — not out of sentiment, but because L3 misses cost real cycles. This tool maps processes to the right cores based on the machine's actual cache topology.
+> Pin processes to CPU cache domains on x86-64 linux operating systems, aided with NUMA awareness.
 
 Run it directly (only way):
 ```bash
