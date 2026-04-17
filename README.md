@@ -75,7 +75,7 @@ So this tool lets you pin a process to a single cache domain - so it stays in ca
 - Root (or `CAP_SYS_NICE`) to change affinity
 - Taskset utility
 
-> [!WARN]
+> [!WARNING]
 > You need permissions to set CPU affinity sometimes.
 > On most systems, this means running as root or having `CAP_SYS_NICE`.
 
