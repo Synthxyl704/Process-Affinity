@@ -16,7 +16,11 @@
 
 Run it directly (only way):
 ```bash
-python main.py <command> [options]
+git clone https://github.com/Synthxyl704/Process-affinity-pinner
+cd Process-affinity-pinner
+python main.py -h
+
+# python main.py <command> [options]
 ```
 ## Commands list
 | Command | Description |
