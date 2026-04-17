@@ -55,34 +55,42 @@ def parseCPUMask(maskString: str) -> List[int]:
             except Exception as NULL:
                 pass;
 
-    return sorted(cores)
+    return sorted(cores);
 
-
-def getCacheTopology() -> Dict[str, Dict[int, List[int]]]:
+def getCacheTopology() -> Dict[str, Dict[int, List[int]]]: 
+    # ^^^ build a map of user's CPU cache architecture by reading (linux) sys files
     CPU_count: int = getTotalCPUCount();
-    cacheData: Dict = {};
+    cacheData: Dict = {}; # type[Dict] = {};
 
     # L1I[nstructions], L1D[ata], L2, L3 per level
     for cacheLevel in ["1", "2", "3"]:
         cacheData[cacheLevel] = {};
 
     for CPU_id in range(CPU_count):
+        # construct a file path string for the current CPU ID 
+        # and then join it with cache (Str) to create a cacheBase path
+        # if that path does not exist, we skip promptly
+
+        # os.path.join(path, *paths)
+        # paths = ["devices", "system", "cpu"]
+        # os.path.join("/sys", *paths)
         CPU_path: str = f"/sys/devices/system/cpu/cpu{CPU_id}";
         cacheBase:str = os.path.join(CPU_path, "cache");
-
+        
         if (not os.path.exists(cacheBase)):
             continue;
-
+        
         for cacheIndex in ["index0", "index1", "index2", "index3"]:
             indexPath: str = os.path.join(cacheBase, cacheIndex);
+            # /sys/.../cpu2/cache/index[0]
 
             if not os.path.exists(indexPath):
                 continue;
 
-            try:
-                cacheLevel: str = open(os.path.join(indexPath, "level")).read().strip();
-                cacheTypeKey: str = open(os.path.join(indexPath, "type")).read().strip();
-                sharedCPUmap: str = (open(os.path.join(indexPath, "shared_cpu_map")).read().strip());
+            try: # extract cache metadata
+                cacheLevel: str = open(os.path.join(indexPath, "level")).read().strip(); # 1, 2, 3 
+                cacheTypeKey: str = open(os.path.join(indexPath, "type")).read().strip();# Instruction (L1I), Data (L1D), Unified
+                sharedCPUmap: str = (open(os.path.join(indexPath, "shared_cpu_map")).read().strip()); # bitmask of cpus sharing this cache
             except:
                 continue;
 
@@ -102,18 +110,23 @@ def getCacheTopology() -> Dict[str, Dict[int, List[int]]]:
             else:
                 cacheTypeKey = f"L{cacheLevel}";
 
-            # group by exact core set
+            # group by exact core set 
             found: bool = False;
             for existing_key, existing_cores in cacheData[cacheLevel].items():
+            # cacheData[cacheLevel="2"] = {
+                # 0: [0,1],
+                # 1: [2,3]...
+            # }
                 if existing_cores == CPU_list:
                     found = True;
                     break;
 
             if not found:
-                cacheData[cacheLevel][len(cacheData[cacheLevel])] = CPU_list;
+                cacheData[cacheLevel][len(cacheData[cacheLevel])] = CPU_list; # add new shared cache CPU(s) 
+                                                                              # using intance such as 2: [4, 5]
 
     result: Dict = {};
-    level_map: Dict[str, str] = {"1": "L1", "2": "L2", "3": "L3"};
+    cacheLevelMap: Dict[str, str] = {"1": "L1", "2": "L2", "3": "L3"};
 
     levelsToCacheTypes = {
         # in linux, 1, 2, 3 are cache levels
@@ -169,19 +182,17 @@ def getCacheTopology() -> Dict[str, Dict[int, List[int]]]:
     # return a new empty dictionary using comprehension
     return {key: value for key, value in result.items() if value};
 
-
 def getCoresForLevel(cacheLevel: str) -> List[int]:
     topo: Dict[str, Dict[int, List[int]]] = getCacheTopology();
     cacheLevelKey = cacheLevel.upper();
 
     if cacheLevelKey in topo:
         for CPUs in topo[cacheLevelKey].values():
-            return CPUs
+            return CPUs;
 
-    return []
+    return [];
 
-
-def get_numa_topology() -> Dict[int, List[int]]:
+def getNUMAtopology() -> Dict[int, List[int]]:
     numa_nodes = {}
     node_base = "/sys/devices/system/node"
 
