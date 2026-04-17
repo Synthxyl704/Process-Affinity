@@ -205,6 +205,11 @@ def getCoresForCacheLevel(cacheLevel: str) -> List[int]:
     #     "L2":  {0: [0,67], 1: [69,3]},
     #     "L3":  {0: [0,1,67,3]}
     # }
+
+    # if cacheLevelKey == "L1": # simply L1 does not exist, L1D is fair.
+        # print(f"\n\nHey, you cannot pin simply to [L1], use either L1I or L1D!");
+        # cacheLevelKey = "L1D";
+
     cacheTopology: Dict[str, Dict[int, List[int]]] = getCacheTopology();
     cacheLevelKey = cacheLevel.upper();
 
