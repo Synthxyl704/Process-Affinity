@@ -67,14 +67,14 @@ def showUserTheirTopologies(args):
 
 def commandPin(args):
     if not args.pid:
-        print(f"\n┌── {_RED}error{_RESET}");
+        print(f"\n┌── {_RED}[ERROR]{_RESET}");
         print(f"└── --pid (process ID) is required\n");
         sys.exit(1);
 
     if args.level:
         processSuccessStatus: bool = pinToCacheLevel(args.pid, args.level);
         if processSuccessStatus == 0 or processSuccessStatus:
-            print(f"\n┌── {_GREEN}pinned{_RESET}");
+            print(f"\n┌── {_GREEN}[PINNED]{_RESET}");
             print(f"├── pid    {args.pid}");
             print(f"└── level  {_CYAN}{args.level}{_RESET}\n");
         sys.exit(0 if (processSuccessStatus == 0 or processSuccessStatus) else 1);
@@ -83,7 +83,7 @@ def commandPin(args):
         from src.pinner import pinProcessToCacheLevel;
         processSuccessStatus: bool = pinProcessToCacheLevel(args.pid, [args.core]);
         if processSuccessStatus == 0 or processSuccessStatus:
-            print(f"\n┌── {_GREEN}pinned{_RESET}");
+            print(f"\n┌── {_GREEN}[PINNED]{_RESET}");
             print(f"├── pid   {args.pid}");
             print(f"└── core  {_CYAN}{args.core}{_RESET}\n");
         sys.exit(0 if (processSuccessStatus == 0 or processSuccessStatus) else 1);
@@ -95,13 +95,13 @@ def commandPin(args):
 
 def commandSuggest(args):
     if not args.pid:
-        print(f"\n┌── {_RED}error{_RESET}");
+        print(f"\n┌── {_RED}[ERROR]{_RESET}");
         print(f"└── --pid (process ID) is required\n");
         sys.exit(1);
 
     currentAffinityCores: List[int] = getCurrentProcessAffinity(args.pid);
     if currentAffinityCores is None:
-        print(f"\n┌── {_RED}error{_RESET}");
+        print(f"\n┌── {_RED}[ERROR]{_RESET}");
         print(f"└── could not read affinity for PID {args.pid}\n");
         sys.exit(1);
 
@@ -125,7 +125,7 @@ def commandSuggest(args):
                 tag = {
                     "optimal":         f"{_GREEN}OPTIMAL{_RESET} ",
                     "expand":          f"{_CYAN}EXPAND{_RESET}  ",
-                    "consolidate":     f"{_MAGENTA}NARROW{_RESET}  ",
+                    "comsolidate":     f"{_MAGENTA}NARROW{_RESET}  ",
                     "partial_overlap": f"{_YELLOW}PARTIAL{_RESET} ",
                 }.get(s["type"], s["type"].ljust(8));
                 subs = [
@@ -135,7 +135,7 @@ def commandSuggest(args):
                 items.append((f"{tag} {s['level']}", subs));
 
             print();
-            _tree(f"┌── {_BOLD}suggestions{_RESET}", items);
+            _tree(f"┌── {_BOLD}[SUGGESTIONS + VIEW]{_RESET}", items);
 
     print();
 
@@ -156,7 +156,7 @@ def main():
 ├── python main.py show
 ├── python main.py show --numa
 ├── python main.py pin --pid 67 --level L2 
-├── ^^^ (NOTE, if pinning PID to L1 or  simply "--level L1" will NOT work (despite the program saying otherwise), use "--level L1I" or "--level L1D" instead!)
+├── ^^^ (NOTE, pinning PID to L1 or  simply "--level L1" will NOT work (despite the program saying otherwise), use "--level L1I" or "--level L1D" instead!)
 ├── python main.py pin --pid 67 --core 7
 ├── python main.py unpin --pid 67
 ├── python main.py suggest --pid 67
@@ -191,7 +191,7 @@ def main():
     elif parsedArgs.command == "unpin":
         success = unpinProcessFromCacheLevel(parsedArgs.pid);
         if success:
-            print(f"\n┌── {_GREEN}unpinned{_RESET}");
+            print(f"\n┌── {_GREEN}[UNPINNED]{_RESET}");
             print(f"├── pid   {parsedArgs.pid}");
             print(f"└── cores {_CYAN}all{_RESET}\n");
         sys.exit(0 if success else 1);
