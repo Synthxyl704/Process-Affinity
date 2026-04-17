@@ -1,15 +1,15 @@
-import os
-import re
+import os as operatingSystem
+import re as regex  
 import subprocess
 import shlex
 # import operator 
 
-from typing import List, Optional, Final
-from .topology import getCacheTopology, getCoresForLevel
+from typing import Dict, List, Optional, Final
+from .topology import getCacheTopology, getCoresForCacheLevel
 
 def buildProcessorMask(cores: List[int]) -> str:
     if (not cores or cores == False or not bool(cores)):
-        return "0/Zero";
+        return "0";
 
     mask: int = 0;
     for core in cores:
@@ -68,7 +68,7 @@ def getCurrentProcessAffinity(processID: int) -> Optional[List[int]]:
         output: str = TASKSET_result.stdout.strip();
 
         # "current affinity masks: 0-3" or "current affinity list: 0,1" or "0-3,4,5"
-        match: str = re.search(r"(?:masks|list):\s*(.+)", output);
+        match: str = regex.search(r"(?:masks|list):\s*(.+)", output);
 
         if not match:
             return None;
@@ -91,7 +91,7 @@ def getCurrentProcessAffinity(processID: int) -> Optional[List[int]]:
     except Exception as ERROR_IN_AFFINITY_RETRIEVAL:
         return None;
 
-def pinProcess(processID: int, coresList: List[int]) -> bool:
+def pinProcessToCacheLevel(processID: int, coresList: List[int]) -> bool:
     if not coresList:
         print(f"[ERROR]: no cores specified/pinned for PID {processID}");
         return False;
@@ -119,63 +119,174 @@ def pinProcess(processID: int, coresList: List[int]) -> bool:
         print(f"[PINNING_ERROR]: {SOME_OTHER_EXCEPTION}");
         return False;
 
-def pin_to_cache_level(pid: int, level: str) -> bool:
-    cores: List[int] = getCoresForLevel(level);
+def pinToCacheLevel(processID: int, cacheLevel: str) -> bool:
+    processorCores: List[int] = getCoresForCacheLevel(cacheLevel); 
+    # > if youre confused
+    # > the cores are inside a processor chip  
 
-    if (not cores):
-        print(f"Error: no cores found for cache level {level}")
-        return False
+    if (not processorCores):
+        print(f"[CACHE_LEVEL_ERROR]: no cores found for cache level {cacheLevel}")
+        return False;
 
-    return pinProcess(pid, cores)
+    return pinProcessToCacheLevel(processID, processorCores);
 
-
-def unpin_process(pid: int) -> bool:
+def unpinProcessFromCacheLevel(processID: int) -> bool:
     try:
-        # Get number of CPUs
-        cpu_count = os.sysconf(os.sysconf_names["SC_NPROCESSORS_ONLN"])
+        # get number of CPUs for a sys
+        CPU_COUNT: int = operatingSystem.sysconf(operatingSystem.sysconf_names["SC_NPROCESSORS_ONLN"])
     except:
-        cpu_count = 12  # fallback
+        # CPU_COUNT: int = 12;  # fallback, but is this bad? edit: yes its bad
+        CPU_COUNT: int = operatingSystem.cpu_count() or 1; 
 
-    core_list = ",".join(str(i) for i in range(cpu_count))
+    coreList: str = ",".join(str(inx) for inx in range(CPU_COUNT));
 
     try:
-        result = subprocess.run(
-            ["taskset", "-pc", core_list, str(pid)],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
+        resultOfSubprocess = subprocess.run(
+            # -p = operate on a process, -c = specify CPUs as a list
+            ["taskset", "-pc", coreList, str(processID)],
+            capture_output=True, text=True, timeout=5
+        );
 
-        if result.returncode != 0:
-            print(f"Error: taskset failed: {result.stderr}")
-            return False
+        if resultOfSubprocess.returncode != 0:
+            print(f"[ERROR]: taskset (utility) failed // error log: {resultOfSubprocess.stderr}")
+            return False;
 
-        print(f"Unpinned PID {pid} (now using all cores)")
-        return True
+        print(f"[UNPIN_SUCCESS]: unpinned PID {processID}, (now open to ALL cores)")
+        return True;
 
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
+    except Exception as ERROR_IN_PROCESS_UNPINN:
+        print(f"[UNPIN_ERROR]: {ERROR_IN_PROCESS_UNPINN}");
+        return False;
 
+def suggestOptimization(processID: int) -> Optional[dict]:
+    # currentCoresForProcess = getCurrentProcessAffinity(processID);
 
-def suggest_optimization(pid: int) -> Optional[dict]:
-    current_cores = getCurrentProcessAffinity(pid)
+    # if currentCoresForProcess is None:
+    #     return None;
 
-    if current_cores is None:
-        return None
+    # cacheTopology: Dict[str, Dict[int, List[int]]] = getCacheTopology();
+    # suggestions: List = [];
 
-    topo = getCacheTopology()
-    suggestions = []
+    # for cacheLevelKey, sharedGroupOfCPUs_DOMAIN in cacheTopology.items():
+    #     for domainID, domainCores in sharedGroupOfCPUs_DOMAIN.items():
+    #         if set(currentCoresForProcess) == set(domainCores):
+    #             suggestions.append(
+    #                 {"level": cacheLevelKey, "cores": domainCores, "optimal": True}
+    #             );
+    #         elif not set(currentCoresForProcess).issubset(set(domainCores)):
+    #             suggestions.append(
+    #                 {"level": cacheLevelKey, "cores": domainCores, "optimal": False}
+    #             );
 
-    for level_key, domains in topo.items():
-        for domain_id, domain_cores in domains.items():
-            if set(current_cores) == set(domain_cores):
-                suggestions.append(
-                    {"level": level_key, "cores": domain_cores, "optimal": True}
-                )
-            elif not set(current_cores).issubset(set(domain_cores)):
-                suggestions.append(
-                    {"level": level_key, "cores": domain_cores, "optimal": False}
-                )
+    # return {"current": currentCoresForProcess, "suggestions": suggestions};
 
-    return {"current": current_cores, "suggestions": suggestions}
+    currentCoresForProcess = getCurrentProcessAffinity(processID);
+
+    if currentCoresForProcess is None:
+        return None; 
+        # if affinity cannot be retrieved
+        # there is something going on
+        # we better fuck off
+
+    currentSet: set = set(currentCoresForProcess);
+    cacheTopology: Dict[str, Dict[int, List[int]]] = getCacheTopology(); # EXG: {"L2": {0: [0,420], 1: [2,1337]}}
+    suggestions: List[dict] = [];
+    domainsSeen: set = set();  # deduplicate by (level, frozenset(cores))
+
+    # we detect cross-domain differences/splits at each cache level
+    splitWarnings: List[dict] = [];
+
+    for cacheLevelKey, sharedGroupOfCPUs_DOMAIN in cacheTopology.items():
+        # process's current cores = [0,2]
+        # domains:
+        # #0 [0,1] -> overlap 
+        # #1 [2,3] -> overlap 
+        # #2 [4,5] -> there is no overlap, so not this
+        # return domains [#0,#1]
+
+        domainsContainingAny: List[int] = [ # build list of cache domains that overlap with current process
+            (domainID) for (domainID, domainCores) in (sharedGroupOfCPUs_DOMAIN.items())
+            if (currentSet & set(domainCores))
+        ];
+
+        # if the process spans more than one cache domain (which is bad), at this cache level, we flag it
+        if len(domainsContainingAny) > 1:
+            splitWarnings.append({
+                "level": cacheLevelKey,
+                "spannedDomains": domainsContainingAny,
+                "type": "split_warning",
+                "priority": 0, # highest urgency
+                "reason": "process affinity crosses cache domain boundaries which introduces severe cache thrash risk!",
+            });
+        
+        # cache thrashing is the CPU cache which frequents invalidation and refilling
+        # so the data in there doesnt remain for long
+
+        for domainID, domainCores in sharedGroupOfCPUs_DOMAIN.items():
+            domainSet: set = set(domainCores);
+            uniqueDomainKey: tuple = (cacheLevelKey, frozenset(domainSet));
+
+            # "L2": {
+            #     0: [0,67],
+            #     1: [0,67], # duplicate domain (so conv to uniqueCoresKey) (same CPUs)
+            #     2: [4,20]
+            # }
+
+            if uniqueDomainKey in domainsSeen:
+                continue;
+            
+            domainsSeen.add(uniqueDomainKey);
+            overlap: set = currentSet & domainSet;
+
+            if (not overlap):
+                continue;  # ignore a completely unrelated cache domain 
+
+            if (currentSet == domainSet):
+                # this signals perfect alignment - process exactly fills one cache domain
+                suggestions.append({
+                    "level": cacheLevelKey,
+                    "cores": domainCores,
+                    "type": "optimal",
+                    "priority": 1,
+                    "reason": "process is perfectly aligned to a single cache-sharing domain!",
+                });
+
+            elif currentSet.issubset(domainSet):
+                # the process fits inside a cache domain, expanding to fill it avoids false sharing
+                suggestions.append({
+                    "level": cacheLevelKey,
+                    "cores": domainCores,
+                    "type": "expand",
+                    "priority": 2,
+                    "reason": f"[process cores fit within domain, expanding to all [{len(domainCores)}] cores will cache locality!",
+                });
+
+            elif domainSet.issubset(currentSet):
+                # cache domain is a strict subset of the process, process is too wide
+                suggestions.append({
+                    "level": cacheLevelKey,
+                    "cores": domainCores,
+                    "type": "consolidate",
+                    "priority": 3,
+                    "reason": "narrowing affinity to this domain subset /might reduce cross-domain traffic...",
+                });
+
+            else:
+                # partial overlap - process straddles domain boundary
+                suggestions.append({
+                    "level": cacheLevelKey,
+                    "cores": domainCores,
+                    "overlapCores": sorted(overlap),
+                    "type": "partial_overlap",
+                    "priority": 4,
+                    "reason": f"only [{len(overlap)} of {len(currentSet)}] process cores share this domain, consider realigning(?)",
+                });
+
+    suggestions.sort(key=lambda s: s["priority"]);
+
+    return {
+        "processID": processID,
+        "current": currentCoresForProcess,
+        "splitWarnings": splitWarnings,
+        "suggestions": suggestions,
+    };
