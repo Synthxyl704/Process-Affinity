@@ -24,9 +24,9 @@ python main.py pin --pid <PID> --level L2
 python main.py pin --pid <PID> --core 7
 ```
 > [!NOTE]
-> Pinning your process or PID to "L1" or  simply "--level L1" will NOT work (despite the program saying otherwise). <br>
-> Use "--level L1I" or "--level L1D" instead (some systems expose both, some only one). <br>
-> If `--level L1` doesn't work and the affinity retains to 0-[CPU_COUNT], try `--level L1D` instead or `--level L1I`.
+> Pinning your process or PID to `--level L1` or  simply `--level L1` - it will NOT work (despite the program saying otherwise). <br>
+> Use `--level L1I` or `--level L1D` instead (some systems expose both, some only one). <br>
+> If `--level L1` doesn't work and the affinity retains to 0-[--CPU_COUNT], try `--level L1D` instead or `--level L1I`.
 
 ### `unpin` - reset that process's affinity to all available cores
 ```bash
