@@ -1,4 +1,4 @@
-# [process + cache] affinity
+# [ process + cache ] affinity
 
 CPU Affinity Pin with Cache Topology Awareness for Linux/POSIX x86-64 systems.
 
