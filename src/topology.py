@@ -17,7 +17,6 @@ def getTotalCPUCount() -> int:
         # if directory.startswith("cpu") and directory[3:].isdigit()
     # ]);
 
-
 def parseCPUMask(maskString: str) -> List[int]:
     cores: set = set();
 
@@ -221,7 +220,7 @@ def getNumaTopology() -> Dict[int, List[int]]:
     # we must handle both
 
     NUMA_nodes: Dict = {}; 
-    nodeBase: str = "/sys/devices/system/node";
+    nodeBase: str = "/sys/devices/system/node"; # hardcoded path
 
     if not os.path.exists(nodeBase):
         return NUMA_nodes;
