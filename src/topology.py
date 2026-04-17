@@ -125,7 +125,7 @@ def getCacheTopology() -> Dict[str, Dict[int, List[int]]]:
                 cacheData[cacheLevel][len(cacheData[cacheLevel])] = CPU_list; # add new shared cache CPU(s) 
                                                                               # using intance such as 2: [4, 5]
 
-    result: Dict = {};
+    mapOfCacheTopologyRESULT: Dict = {};
     cacheLevelMap: Dict[str, str] = {"1": "L1", "2": "L2", "3": "L3"};
 
     levelsToCacheTypes = {
@@ -137,7 +137,7 @@ def getCacheTopology() -> Dict[str, Dict[int, List[int]]]:
         ("3", "Unified"): "L3",
     };
 
-    result = {"L1I": {}, "L1D": {}, "L2": {}, "L3": {}};
+    mapOfCacheTopologyRESULT = {"L1I": {}, "L1D": {}, "L2": {}, "L3": {}};
 
     for CPU_id in range(CPU_count):
         CPU_path: str = f"/sys/devices/system/cpu/cpu{CPU_id}"; # hardcoded path
@@ -163,60 +163,87 @@ def getCacheTopology() -> Dict[str, Dict[int, List[int]]]:
             if not cacheLevel:
                 continue;
 
-            CPU_list: List[int] = parseCPUMask(sharedCPUmap);
+            CPU_list: List[int] = parseCPUMask(sharedCPUmap); # CPUs that share this cache instance
             cacheTypeKey: str | None = levelsToCacheTypes.get((cacheLevel, cacheTypeKey));
 
             if cacheTypeKey is None:
                 continue;
 
-            domainID = 0; # avoid duplicates
-            for daGreatDomainID, existing in result[cacheTypeKey].items():
+            domainID = 0; # domain = shared group of CPUs using a cache instance // we will avoid duplicates
+            for daGreatDomainIDwhichIsAKey, existing in mapOfCacheTopologyRESULT[cacheTypeKey].items():
                 if existing == CPU_list:
-                    domainID = daGreatDomainID;
+                    domainID = daGreatDomainIDwhichIsAKey;
                     break;
             else:
-                domainID = len(result[cacheTypeKey]);
+                domainID = len(mapOfCacheTopologyRESULT[cacheTypeKey]);
+            # result = { # EXG
+            #     "L1I": {
+            #         0: [0],
+            #         1: [1],
+            #         2: [2],
+            #         3: [3]
+            #     },
+            #     "L1D": {
+            #         0: [0],
+            #         1: [1],
+            #     },
+            #     "L2": {
+            #         0: [0, 1],
+            #         1: [2, 3]
+            #     },
+            #     "L3": {
+            #         0: [0, 1, 2, 3]
+            #     }
+            # }
+            mapOfCacheTopologyRESULT[cacheTypeKey][domainID] = CPU_list;
 
-            result[cacheTypeKey][domainID] = CPU_list;
+    # return a new that only includes cache types that actually have data, some cache is unused, we dont want those
+    return {key: value for key, value in mapOfCacheTopologyRESULT.items() if value};
 
-    # return a new empty dictionary using comprehension
-    return {key: value for key, value in result.items() if value};
-
-def getCoresForLevel(cacheLevel: str) -> List[int]:
-    topo: Dict[str, Dict[int, List[int]]] = getCacheTopology();
+def getCoresForCacheLevel(cacheLevel: str) -> List[int]:
+    # cacheTopo = {
+    #     "L1I": {0: [0], 1: [1]},
+    #     "L2":  {0: [0,67], 1: [69,3]},
+    #     "L3":  {0: [0,1,67,3]}
+    # }
+    cacheTopology: Dict[str, Dict[int, List[int]]] = getCacheTopology();
     cacheLevelKey = cacheLevel.upper();
 
-    if cacheLevelKey in topo:
-        for CPUs in topo[cacheLevelKey].values():
+    if (cacheLevelKey in cacheTopology):
+        for CPUs in cacheTopology[cacheLevelKey].values(): # {0: [0,67], 1: [420,3]} -> eturn {[0,67], [420,3]}
             return CPUs;
 
+    # fallback and return no CPUs in case
     return [];
 
-def getNUMAtopology() -> Dict[int, List[int]]:
-    numa_nodes = {}
-    node_base = "/sys/devices/system/node"
+def getNumaTopology() -> Dict[int, List[int]]:
+    # a machine might be NUMA aware or !NUMA aware
+    # we must handle both
 
-    if not os.path.exists(node_base):
-        return numa_nodes
+    NUMA_nodes: Dict = {}; 
+    nodeBase: str = "/sys/devices/system/node";
 
-    for node_name in os.listdir(node_base):
-        if not node_name.startswith("node"):
-            continue
+    if not os.path.exists(nodeBase):
+        return NUMA_nodes;
 
-        try:
-            node_id = int(node_name[4:])
-        except:
-            continue
-
-        cpumap_path = os.path.join(node_base, node_name, "cpumap")
-
-        if not os.path.exists(cpumap_path):
-            continue
+    for nodeName in os.listdir(nodeBase):
+        if not nodeName.startswith("node"): # if !NUMA aware 
+            continue;
 
         try:
-            cpus = parseCPUMask(open(cpumap_path).read().strip())
-            numa_nodes[node_id] = cpus
+            nodeID = int(nodeName[4:]); # node[X]
         except:
-            continue
+            continue;
 
-    return numa_nodes
+        cpuMap_Path = os.path.join(nodeBase, nodeName, "cpumap")
+
+        if not os.path.exists(cpuMap_Path):
+            continue;
+
+        try:
+            CPUs = parseCPUMask(open(cpuMap_Path).read().strip());
+            NUMA_nodes[nodeID] = CPUs;
+        except:
+            continue;
+
+    return NUMA_nodes;
