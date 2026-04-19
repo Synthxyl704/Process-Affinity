@@ -52,7 +52,7 @@ python main.py unpin --pid <PID>
 ### `suggest` — get good cache placement recommendations
 ```bash
 python main.py suggest --pid <PID>
-python main.py suggest --pid <PID> -v    # verbose
+python main.py suggest --pid <PID> -v # kinda verbose logging 
 ```
 **Verbose mode `[-v]` shows**:
 - Split/Cross-domain warnings (when process spans multiple cache domains)
