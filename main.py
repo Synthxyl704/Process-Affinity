@@ -125,7 +125,7 @@ def commandSuggest(args):
                 tag = {
                     "optimal":         f"{_GREEN}OPTIMAL{_RESET} ",
                     "expand":          f"{_CYAN}EXPAND{_RESET}  ",
-                    "comsolidate":     f"{_MAGENTA}NARROW{_RESET}  ",
+                    "consolidate":     f"{_MAGENTA}NARROW{_RESET}  ",
                     "partial_overlap": f"{_YELLOW}PARTIAL{_RESET} ",
                 }.get(s["type"], s["type"].ljust(8));
                 subs = [
