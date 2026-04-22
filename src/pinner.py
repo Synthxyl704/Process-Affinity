@@ -32,7 +32,7 @@ def convertBitmaskToCores(maskString: str) -> List[int]:
     else:
         HEX2INT_mask: int = (int(maskString, BASE16_FORMAT)) if (maskString.startswith("0")) else int(maskString);
 
-    coresList: List = [];
+    coresList: List[int] = [];
     bitFlag: int = int(0, base=2);
 
     # [8/4/2/1]: 7 -> 0111 = 1 => TRUE
