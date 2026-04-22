@@ -80,8 +80,8 @@ def commandPin(args):
         sys.exit(0 if (processSuccessStatus == 0 or processSuccessStatus) else 1);
 
     if args.core:
-        from src.pinner import pinProcessToCacheLevel;
-        processSuccessStatus: bool = pinProcessToCacheLevel(args.pid, [args.core]);
+        from src.pinner import pinToCacheLevel;
+        processSuccessStatus: bool = pinToCacheLevel(args.pid, [args.core]);
         if processSuccessStatus == 0 or processSuccessStatus:
             print(f"\n┌── {_GREEN}[PINNED]{_RESET}");
             print(f"├── pid   {args.pid}");
