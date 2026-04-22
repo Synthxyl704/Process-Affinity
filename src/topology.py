@@ -214,11 +214,23 @@ def getCoresForCacheLevel(cacheLevel: str) -> List[int]:
     cacheLevelKey = cacheLevel.upper();
 
     if (cacheLevelKey in cacheTopology):
-        for CPUs in cacheTopology[cacheLevelKey].values(): # {0: [0,67], 1: [420,3]} -> eturn {[0,67], [420,3]}
-            return CPUs;
+        cores: List[int] = [];
+        for CPUs in cacheTopology[cacheLevelKey].values(): # {0: [0,67], 1: [420,3]} -> return {[0,67], [420,3]}
+            cores.extend(CPUs);
+        return cores;
 
     # fallback and return no CPUs in case
     return [];
+
+# def getCoresForCacheLevel(cacheLevel: str) -> List[int]:
+#     cacheTopology = getCacheTopology();
+#     cacheLevelKey = cacheLevel.upper();
+
+#     return [
+#         CPU 
+#         for CPUs in cacheTopology.get(cacheLevelKey, {}).values()
+#         for CPU in CPUs
+#     ];
 
 def getNumaTopology() -> Dict[int, List[int]]:
     # a machine might be NUMA aware or !NUMA aware
