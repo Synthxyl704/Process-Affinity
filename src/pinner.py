@@ -75,7 +75,7 @@ def getCurrentProcessAffinity(processID: int) -> Optional[List[int]]:
 
         maskString = match.group(1).strip();
 
-        cores: List = [];
+        cores: List[int] = [];
         for part in maskString.split(","):
             part = part.strip();
 
