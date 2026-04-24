@@ -148,7 +148,9 @@ def main():
 └── unpin    unpin process (reset to all cores)
 ┌── [EXAMPLES]:
 ├── python main.py show
+├── python main.py show --json
 ├── python main.py show --numa
+├── python main.py show --numa --json
 ├── python main.py pin --pid 67 --level L2 
 ├── ^^^ (NOTE, pinning PID to L1 or  simply "--level L1" will NOT work (despite the program saying otherwise), use "--level L1I" or "--level L1D" instead!)
 ├── python main.py pin --pid 67 --core 7
