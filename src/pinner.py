@@ -183,40 +183,6 @@ def pinToCacheLevel(processID: int, cacheLevel: str) -> bool:
     print(f"[INFO]: selected {cacheLevelKey} domain {chosenDomainID} -> cores {chosenCores}");
     return pinProcessToCacheLevel(processID, chosenCores);
 
-def pinToCacheLevel(processID: int, cacheLevel: str) -> bool:
-    cacheLevelKey: str = cacheLevel.upper();
-    if cacheLevelKey == "L1":
-        cacheLevelKey = "L1D";
-
-    cacheTopology: Dict[str, Dict[int, List[int]]] = getCacheTopology();
-    domains: Dict[int, List[int]] = cacheTopology.get(cacheLevelKey, {});
-    if not domains:
-        print(f"[CACHE_LEVEL_ERROR]: no cores found for cache level {cacheLevel}")
-        return False;
-
-    currentAffinity: List[int] = getCurrentProcessAffinity(processID);
-    if currentAffinity is None:
-        print(f"[CACHE_LEVEL_ERROR]: failed to retrieve affinity for process {processID}")
-        return False;
-
-    currentAffinitySet = set(currentAffinity);
-
-    chosenDomainID: int = sorted(domains.keys())[0];
-    bestOverlap: int = (-1);
-    bestDomainSize: int = (10**9);
-
-    for domainID, domainCores in domains.items():
-        overlap = len(currentAffinitySet.intersection(domainCores));
-        domainSize = len(domainCores);
-        if (overlap > bestOverlap) or (overlap == bestOverlap and domainSize < bestDomainSize):
-            chosenDomainID = domainID;
-            bestOverlap = overlap;
-            bestDomainSize = domainSize;
-
-    chosenCores: List[int] = sorted(domains[chosenDomainID]);
-    print(f"[INFO]: selected {cacheLevelKey} domain {chosenDomainID} -> cores {chosenCores}");
-    return pinProcessToCacheLevel(processID, chosenCores);
-
 def unpinProcessFromCacheLevel(processID: int) -> bool:
     try:
         # get number of CPUs for a sys
