@@ -70,7 +70,8 @@ def getCurrentProcessAffinity(processID: int) -> Optional[List[int]]:
         output: str = TASKSET_result.stdout.strip();
 
         # "current affinity masks: 0-3" or "current affinity list: 0,1" or "0-3,4,5"
-        match: str = regex.search(r"(?:masks|list):\s*(.+)", output);
+        # Also handles hex masks like "pid 123's current affinity mask: f0"
+        match: str = regex.search(r"(?:masks|list|mask):\s*(.+)", output);
 
         if not match:
             return None;
@@ -78,19 +79,46 @@ def getCurrentProcessAffinity(processID: int) -> Optional[List[int]]:
         maskString = match.group(1).strip();
 
         cores: List[int] = [];
-        for part in maskString.split(","):
-            part = part.strip();
+        
+        # we check if it looks like a hex mask (contains a-f or A-F)
+        # taskset usually outputs "list: 0,1,2" or "mask: ff"
+        # If it contains letters, it's likely a hex mask,
+        # though i dont think we will need this, god measure enough
+        if any(c in maskString for c in 'abcdefABCDEF'):
+            # Parse as hex mask
+            try:
+                maskValue = int(maskString, 16);
+                bitIndex = 0;
+                while maskValue > 0:
+                    if maskValue & 1:
+                        cores.append(bitIndex);
+                    maskValue >>= 1;
+                    bitIndex += 1;
+            except ValueError:
+                return None;
+        else:
+            # parse as comma-separated list/ranges
+            for part in maskString.split(","):
+                part = part.strip();
 
-            if "-" in part:
-                parts = part.split("-");
-                cores.extend(range(int(parts[0]), int(parts[1]) + 1));
-            
-            else:
-                cores.append(int(part, 10));
+                if "-" in part:
+                    parts = part.split("-");
+                    try:
+                        start = int(parts[0])
+                        end = int(parts[1])
+                        cores.extend(range(start, end + 1));
+                    except ValueError:
+                        return None
+                
+                else:
+                    try:
+                        cores.append(int(part, 10));
+                    except ValueError:
+                        return None
 
         return sorted(cores);
 
-    except Exception as ERROR_IN_AFFINITY_RETRIEVAL:
+    except (subprocess.TimeoutExpired, OSError, ValueError):
         return None;
 
 def pinProcessToCacheLevel(processID: int, coresList: List[int]) -> bool:
