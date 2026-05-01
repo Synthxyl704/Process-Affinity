@@ -3,8 +3,8 @@
 
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/ed9071bf-bcbd-41fb-88bc-db138f564d8b" />
 
-## See its working in here
-https://drive.google.com/file/d/17lApzbGUHCLqxyw1tTULDt3-Pb9FXLxL/view?usp=sharing
+(You can view its working in here) 
+> https://drive.google.com/file/d/17lApzbGUHCLqxyw1tTULDt3-Pb9FXLxL/view?usp=sharing
 
 ## Requirements
 - Linux (ONLY)
