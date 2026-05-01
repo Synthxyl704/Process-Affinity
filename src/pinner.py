@@ -212,27 +212,6 @@ def unpinProcessFromCacheLevel(processID: int) -> bool:
         return False;
 
 def suggestOptimization(processID: int) -> Optional[dict]:
-    # currentCoresForProcess = getCurrentProcessAffinity(processID);
-
-    # if currentCoresForProcess is None:
-    #     return None;
-
-    # cacheTopology: Dict[str, Dict[int, List[int]]] = getCacheTopology();
-    # suggestions: List = [];
-
-    # for cacheLevelKey, sharedGroupOfCPUs_DOMAIN in cacheTopology.items():
-    #     for domainID, domainCores in sharedGroupOfCPUs_DOMAIN.items():
-    #         if set(currentCoresForProcess) == set(domainCores):
-    #             suggestions.append(
-    #                 {"level": cacheLevelKey, "cores": domainCores, "optimal": True}
-    #             );
-    #         elif not set(currentCoresForProcess).issubset(set(domainCores)):
-    #             suggestions.append(
-    #                 {"level": cacheLevelKey, "cores": domainCores, "optimal": False}
-    #             );
-
-    # return {"current": currentCoresForProcess, "suggestions": suggestions};
-
     currentCoresForProcess = getCurrentProcessAffinity(processID);
 
     if currentCoresForProcess is None:
@@ -263,7 +242,9 @@ def suggestOptimization(processID: int) -> Optional[dict]:
         ];
 
         # if the process spans more than one cache domain (which is bad), at this cache level, we flag it
-        if len(domainsContainingAny) > 1:
+        isSplit: bool = len(domainsContainingAny) > 1;
+        
+        if isSplit:
             splitWarnings.append({
                 "level": cacheLevelKey,
                 "spannedDomains": domainsContainingAny,
@@ -274,6 +255,35 @@ def suggestOptimization(processID: int) -> Optional[dict]:
         
         # cache thrashing is the CPU cache which frequents invalidation and refilling
         # so the data in there doesnt remain for long
+
+        # Pre-calculate best consolidation target for this level if split
+        bestConsolidationDomainID: Optional[int] = None;
+        bestConsolidationOverlap: int = -1;
+        bestConsolidationSize: int = 10**9;
+
+        if isSplit:
+            for dID, dCores in sharedGroupOfCPUs_DOMAIN.items():
+                dSet = set(dCores);
+                dOverlap = len(currentSet & dSet);
+                dSize = len(dCores);
+                
+                if dOverlap == 0:
+                    continue;
+
+                isBetter = False;
+                if dOverlap > bestConsolidationOverlap:
+                    isBetter = True;
+                elif dOverlap == bestConsolidationOverlap:
+                    if dSize < bestConsolidationSize:
+                        isBetter = True;
+                    elif dSize == bestConsolidationSize:
+                        if dID < bestConsolidationDomainID:
+                            isBetter = True;
+                
+                if isBetter:
+                    bestConsolidationDomainID = dID;
+                    bestConsolidationOverlap = dOverlap;
+                    bestConsolidationSize = dSize;
 
         for domainID, domainCores in sharedGroupOfCPUs_DOMAIN.items():
             domainSet: set = set(domainCores);
@@ -290,6 +300,7 @@ def suggestOptimization(processID: int) -> Optional[dict]:
             
             domainsSeen.add(uniqueDomainKey);
             overlap: set = currentSet & domainSet;
+            overlapCount: int = len(overlap);
 
             if (not overlap):
                 continue;  # ignore a completely unrelated cache domain 
@@ -305,35 +316,32 @@ def suggestOptimization(processID: int) -> Optional[dict]:
                 });
 
             elif currentSet.issubset(domainSet):
-                # the process fits inside a cache domain, expanding to fill it avoids false sharing
+                # The process fits inside a single cache domain.
+                # This is a healthy/neutral state. Emit a signal so consumers know analysis happened.
                 suggestions.append({
                     "level": cacheLevelKey,
                     "cores": domainCores,
-                    "type": "expand",
+                    "type": "contained",
                     "priority": 2,
-                    "reason": f"[process cores fit within domain, expanding to all [{len(domainCores)}] cores will cache locality!",
+                    "reason": f"process is contained within a single cache domain ({overlapCount}/{len(domainCores)} cores used). No action needed.",
                 });
 
-            elif domainSet.issubset(currentSet):
-                # cache domain is a strict subset of the process, process is too wide
+            elif isSplit and domainID == bestConsolidationDomainID:
+                # Process is split, and this is the best domain to consolidate to.
+                # This covers both 'domainSet.issubset(currentSet)' and partial overlaps.
                 suggestions.append({
                     "level": cacheLevelKey,
                     "cores": domainCores,
                     "type": "consolidate",
                     "priority": 3,
-                    "reason": "narrowing affinity to this domain subset /might reduce cross-domain traffic...",
+                    "overlapCount": overlapCount,
+                    "totalProcessCores": len(currentSet),
+                    "reason": f"Consolidate to this domain to reduce cross-domain traffic. It holds {overlapCount}/{len(currentSet)} of your process cores (best available target).",
                 });
 
             else:
-                # partial overlap - process straddles domain boundary
-                suggestions.append({
-                    "level": cacheLevelKey,
-                    "cores": domainCores,
-                    "overlapCores": sorted(overlap),
-                    "type": "partial_overlap",
-                    "priority": 4,
-                    "reason": f"only [{len(overlap)} of {len(currentSet)}] process cores share this domain, consider realigning(?)",
-                });
+                # Partial overlap but not the best target, or other non-actionable states.
+                pass;
 
     suggestions.sort(key=lambda s: s["priority"]);
 
