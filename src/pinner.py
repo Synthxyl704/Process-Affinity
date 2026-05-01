@@ -13,7 +13,7 @@ def buildProcessorMask(cores: List[int]) -> str:
 
     mask: int = 0;
     for core in cores:
-        if not isinstance(core, int) or (core < 0):
+        if not isinstance(core, int) or core < 0:
             return "0";
         # shift 01 by core positions 
         # [0, 2, 3] 
@@ -70,7 +70,7 @@ def getCurrentProcessAffinity(processID: int) -> Optional[List[int]]:
         output: str = TASKSET_result.stdout.strip();
 
         # "current affinity masks: 0-3" or "current affinity list: 0,1" or "0-3,4,5"
-        # Also handles hex masks like "pid 123's current affinity mask: f0"
+        # also handles hex masks like "pid 123's current affinity mask: f0"
         match: str = regex.search(r"(?:masks|list|mask):\s*(.+)", output);
 
         if not match:
@@ -85,7 +85,7 @@ def getCurrentProcessAffinity(processID: int) -> Optional[List[int]]:
         # If it contains letters, it's likely a hex mask,
         # though i dont think we will need this, god measure enough
         if any(c in maskString for c in 'abcdefABCDEF'):
-            # Parse as hex mask
+            # parse it as hex (mask)
             try:
                 maskValue = int(maskString, 16);
                 bitIndex = 0;
@@ -148,6 +148,40 @@ def pinProcessToCacheLevel(processID: int, coresList: List[int]) -> bool:
     except Exception as SOME_OTHER_EXCEPTION:
         print(f"[PINNING_ERROR]: {SOME_OTHER_EXCEPTION}");
         return False;
+
+def pinToCacheLevel(processID: int, cacheLevel: str) -> bool:
+    cacheLevelKey: str = cacheLevel.upper();
+    if cacheLevelKey == "L1":
+        cacheLevelKey = "L1D";
+
+    cacheTopology: Dict[str, Dict[int, List[int]]] = getCacheTopology();
+    domains: Dict[int, List[int]] = cacheTopology.get(cacheLevelKey, {});
+    if not domains:
+        print(f"[CACHE_LEVEL_ERROR]: no cores found for cache level {cacheLevel}")
+        return False;
+
+    currentAffinity: List[int] = getCurrentProcessAffinity(processID);
+    if currentAffinity is None:
+        print(f"[CACHE_LEVEL_ERROR]: failed to retrieve affinity for process {processID}")
+        return False;
+
+    currentAffinitySet = set(currentAffinity);
+
+    chosenDomainID: int = sorted(domains.keys())[0];
+    bestOverlap: int = (-1);
+    bestDomainSize: int = (10**9);
+
+    for domainID, domainCores in domains.items():
+        overlap = len(currentAffinitySet.intersection(domainCores));
+        domainSize = len(domainCores);
+        if (overlap > bestOverlap) or (overlap == bestOverlap and domainSize < bestDomainSize):
+            chosenDomainID = domainID;
+            bestOverlap = overlap;
+            bestDomainSize = domainSize;
+
+    chosenCores: List[int] = sorted(domains[chosenDomainID]);
+    print(f"[INFO]: selected {cacheLevelKey} domain {chosenDomainID} -> cores {chosenCores}");
+    return pinProcessToCacheLevel(processID, chosenCores);
 
 def pinToCacheLevel(processID: int, cacheLevel: str) -> bool:
     cacheLevelKey: str = cacheLevel.upper();
